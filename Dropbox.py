@@ -59,6 +59,25 @@ class Dropbox:
         # PARA LA OBTENCION DEL ACCESS TOKEN
         #############################################
 
+        url = f"https://www.dropbox.com/oauth2/authorize?response_type=code&client_id={app_key}&redirect_uri={urllib.parse.quote(redirect_uri)}"
+        webbrowser.open(url)
+        auth_code = self.local_server()
+        params = {
+            'code': auth_code,
+            'grant_type': 'authorization_code',
+            'client_id': app_key,
+            'client_secret': app_secret,
+            'redirect_uri': redirect_uri
+        }
+        cabeceras = {
+            'User-Agent': 'Python Client',
+            'Content-Type': 'application/x-www-form-urlencoded'
+        }
+        uri = 'https://api.dropboxapi.com/oauth2/token'
+        response = requests.post(uri, data=params, headers=cabeceras)
+        json_response = json.loads(response.content)
+        self._access_token = json_response['access_token']
+
         self._root.destroy()
 
     def list_folder(self, msg_listbox):

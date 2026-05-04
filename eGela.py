@@ -3,9 +3,9 @@ from tkinter import messagebox
 import requests
 import urllib
 from urllib.parse import unquote
-import  bs4
+import bs4
 import time
-import helpers
+import helper
 
 class eGela:
     _login = 0
@@ -18,7 +18,7 @@ class eGela:
         self._root = root
 
     def check_credentials(self, username, password, event=None):
-        popup, progress_var, progress_bar = helpers.progress("check_credentials", "Logging into eGela...")
+        popup, progress_var, progress_bar = helper.progress("check_credentials", "Logging into eGela...")
         progress = 0
         progress_var.set(progress)
         progress_bar.update()
@@ -83,7 +83,8 @@ class eGela:
         if respuesta2.status_code == 303:
             # Obtenemos la cabecera Location
             location = respuesta2.headers['Location']
-            MoodleSessionegela = respuesta2.headers['Set-Cookie'].split('MoodleSessionegela=')[1].split(';')[0]
+            if "Set-Cookie" in respuesta2.headers:
+                MoodleSessionegela = respuesta2.headers['Set-Cookie'].split('MoodleSessionegela=')[1].split(';')[0]
         else:
             print("Error al autenticarse.")
             print(respuesta2.status_code)
@@ -176,7 +177,7 @@ class eGela:
             messagebox.showinfo("Alert Message", "Login incorrect!")
 
     def get_pdf_refs(self):
-        popup, progress_var, progress_bar = helpers.progress("get_pdf_refs", "Downloading PDF list...")
+        popup, progress_var, progress_bar = helper.progress("get_pdf_refs", "Downloading PDF list...")
         progress = 0
         progress_var.set(progress)
         progress_bar.update()
@@ -187,9 +188,23 @@ class eGela:
         # Y PROCESAMIENTO DE LA RESPUESTA HTTP
         #############################################
 
+        metodo = "GET"
+        uri = self._curso
+        cabeceras = {
+            "Cookie": f"MoodleSessionegela={self._cookie}"
+        }
 
-        progress_step = float(100.0 / len(NUMERO_DE_PDF_EN_EGELA))
+        respuesta = requests.request(metodo, uri, headers=cabeceras, allow_redirects=False)
 
+        print("------------------------")
+        print(f"Solicitud:\n\t{metodo} {uri}")
+        print(f"Respuesta:\n\t{respuesta.status_code} {respuesta.reason}")
+
+        if respuesta.status_code != 200:
+            print("Error al acceder a la página principal de la asignatura.")
+            print(respuesta.status_code)
+            popup.destroy()
+            return self._refs
 
         print("\n##### Analisis del HTML... #####")
         #############################################
@@ -197,11 +212,45 @@ class eGela:
         # PARA BUSCAR PDFs
         #############################################
 
+        soup = bs4.BeautifulSoup(respuesta.text, "html.parser")
+
+        self._refs = []
+
+        enlaces = soup.find_all("a")
+
+        for enlace in enlaces:
+            href = enlace.get("href")
+
+            if href is not None and "mod/resource/view.php" in href:
+
+                respuesta_pdf = requests.request(
+                    "GET",
+                    href,
+                    headers=cabeceras,
+                    allow_redirects=False
+                )
+
+                if respuesta_pdf.status_code == 303:
+                    pdf_link = respuesta_pdf.headers["Location"]
+
+                    pdf_name = pdf_link.split("/")[-1]
+                    pdf_name = unquote(pdf_name)
+
+                    if pdf_name.lower().endswith(".pdf"):
+                        self._refs.append({
+                            "pdf_name": pdf_name,
+                            "pdf_link": pdf_link
+                        })
+
         # INICIALIZA Y ACTUALIZAR BARRA DE PROGRESO
         # POR CADA PDF ANIADIDO EN self._refs
 
-        progress_step = float(100.0 / len(NUMERO_DE_PDF_EN_EGELA))
+        if len(self._refs) > 0:
+            progress_step = float(100.0 / len(self._refs))
 
+            progress = 0
+            for pdf in self._refs:
+                print(pdf["pdf_name"], "->", pdf["pdf_link"])
 
                 progress += progress_step
                 progress_var.set(progress)
@@ -218,5 +267,14 @@ class eGela:
         # RELLENAR CON CODIGO DE LA PETICION HTTP
         # Y PROCESAMIENTO DE LA RESPUESTA HTTP
         #############################################
+        cabeceras = {
+            'Cookie': f'MoodleSessionegela={self._cookie}'
+        }
+        pdf_object = self._refs[selection]
+        pdf_name = pdf_object['pdf_name'] + ".pdf"
+        pdf_link = pdf_object['pdf_link']
+        pdf_response = requests.request('GET', pdf, headers=cabeceras, allow_redirects=False)
+        pdf_link = requests.request('GET', pdf_response.headers['Location'], headers=cabeceras, allow_redirects=False)
+        pdf_content = pdf_link.content
 
         return pdf_name, pdf_content
