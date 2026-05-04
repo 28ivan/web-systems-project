@@ -3,7 +3,7 @@ from tkinter import messagebox
 import requests
 import urllib
 from urllib.parse import unquote
-from bs4 import BeautifulSoup
+import  bs4
 import time
 import helpers
 
@@ -39,8 +39,8 @@ class eGela:
         if respuesta1.status_code == 200:
             # Obtenemos la MoodleSessionegela y el logintoken
             # Cabecera SetCookie: MoodleSessionegela
-            _cookie = respuesta1.headers['Set-Cookie']
-            MoodleSessionegela = _cookie.split("MoodleSessionegela=")[1].split(";")[0]
+            cookie = respuesta1.headers['Set-Cookie']
+            MoodleSessionegela = cookie.split("MoodleSessionegela=")[1].split(";")[0]
             # logintoken campo input del fomulario
             token = bs4.BeautifulSoup(respuesta1.text, "html.parser")
             logintoken = token.find("input", {"name": "logintoken"})["value"]
@@ -61,6 +61,34 @@ class eGela:
         # Y PROCESAMIENTO DE LA RESPUESTA HTTP
         #############################################
 
+        metodo = 'POST'
+        uri = "https://egela.ehu.eus/login/index.php"
+        cabeceras = {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'Cookie': f'MoodleSessionegela={MoodleSessionegela}'
+        }
+        cuerpo = {
+            'username': username,
+            'password': password,
+            'logintoken': logintoken
+        }
+        respuesta2 = requests.request(metodo, uri, headers=cabeceras, data=cuerpo, allow_redirects=False)
+
+        print('------------------------')
+        print(f'Solicitud2:\n\t{metodo} {uri}')
+        print(f'\t{cuerpo}')
+        print(f'Respuesta2:\n\t{respuesta2.status_code} {respuesta2.reason}')
+        print(f'\t{respuesta2.headers["Location"]}\n\t{respuesta2.headers["Set-Cookie"]}')
+
+        if respuesta2.status_code == 303:
+            # Obtenemos la cabecera Location
+            location = respuesta2.headers['Location']
+            MoodleSessionegela = respuesta2.headers['Set-Cookie'].split('MoodleSessionegela=')[1].split(';')[0]
+        else:
+            print("Error al autenticarse.")
+            print(respuesta2.status_code)
+            exit(1)
+
         progress = 50
         progress_var.set(progress)
         progress_bar.update()
@@ -71,6 +99,27 @@ class eGela:
         # RELLENAR CON CODIGO DE LA PETICION HTTP
         # Y PROCESAMIENTO DE LA RESPUESTA HTTP
         #############################################
+
+        metodo = 'GET'
+        uri = location
+        cabeceras = {
+            'Cookie': f'MoodleSessionegela={MoodleSessionegela}'
+        }
+        respuesta3 = requests.request(metodo, uri, headers=cabeceras, allow_redirects=False)
+
+        print('------------------------')
+        print(f'Solicitud3:\n\t{metodo} {uri}')
+        print(f'Respuesta3:\n\t{respuesta3.status_code} {respuesta3.reason}')
+        print(f'\t{respuesta3.headers["Location"]}')
+
+        if respuesta3.status_code != 303:
+            print("Error al autenticarse.")
+            print(respuesta3.status_code)
+            # print(respuesta3.text)
+            exit(1)
+        else:
+            # Obtenemos la cabecera Location
+            location = respuesta3.headers['Location']
 
         progress = 75
         progress_var.set(progress)
@@ -84,6 +133,30 @@ class eGela:
         # Y PROCESAMIENTO DE LA RESPUESTA HTTP
         #############################################
 
+        metodo = 'GET'
+        uri = location
+        cabeceras = {
+            'Cookie': f'MoodleSessionegela={MoodleSessionegela}'
+        }
+        respuesta4 = requests.request(metodo, uri, headers=cabeceras, allow_redirects=False)
+
+        print('------------------------')
+        print(f'Solicitud4:\n\t{metodo} {uri}')
+        print(f'Respuesta4:\n\t{respuesta4.status_code} {respuesta4.reason}')
+
+        if respuesta4.status_code != 200:
+            print("Error al buscar el nombre.")
+            exit(1)
+        else:
+            COMPROBACION_DE_LOG_IN = True
+            soup = bs4.BeautifulSoup(respuesta4.text, 'html.parser')
+            enlaces = soup.find_all('a')
+            for enlace in enlaces:
+                if "Sistemas Web" in enlace.text:
+                    uri_curso = enlace.get('href')
+
+
+
         progress = 100
         progress_var.set(progress)
         progress_bar.update()
@@ -96,11 +169,14 @@ class eGela:
             # ACTUALIZAR VARIABLES
             #############################################
             self._root.destroy()
+            self._login = 1
+            self._cookie = MoodleSessionegela
+            self._curso = uri_curso
         else:
             messagebox.showinfo("Alert Message", "Login incorrect!")
 
     def get_pdf_refs(self):
-        popup, progress_var, progress_bar = helper.progress("get_pdf_refs", "Downloading PDF list...")
+        popup, progress_var, progress_bar = helpers.progress("get_pdf_refs", "Downloading PDF list...")
         progress = 0
         progress_var.set(progress)
         progress_bar.update()
@@ -110,6 +186,7 @@ class eGela:
         # RELLENAR CON CODIGO DE LA PETICION HTTP
         # Y PROCESAMIENTO DE LA RESPUESTA HTTP
         #############################################
+
 
         progress_step = float(100.0 / len(NUMERO_DE_PDF_EN_EGELA))
 
