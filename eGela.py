@@ -5,7 +5,7 @@ import urllib
 from urllib.parse import unquote
 from bs4 import BeautifulSoup
 import time
-import helper
+import helpers
 
 class eGela:
     _login = 0
@@ -18,7 +18,7 @@ class eGela:
         self._root = root
 
     def check_credentials(self, username, password, event=None):
-        popup, progress_var, progress_bar = helper.progress("check_credentials", "Logging into eGela...")
+        popup, progress_var, progress_bar = helpers.progress("check_credentials", "Logging into eGela...")
         progress = 0
         progress_var.set(progress)
         progress_bar.update()
@@ -30,6 +30,24 @@ class eGela:
         # RELLENAR CON CODIGO DE LA PETICION HTTP
         # Y PROCESAMIENTO DE LA RESPUESTA HTTP
         #############################################
+
+        respuesta1 = requests.request(metodo, uri, allow_redirects=False)
+        print('------------------------')
+        print(f'Solicitud1:\n\t{metodo} {uri}')
+        print(f'Respuesta1:\n\t{respuesta1.status_code} {respuesta1.reason}')
+
+        if respuesta1.status_code == 200:
+            # Obtenemos la MoodleSessionegela y el logintoken
+            # Cabecera SetCookie: MoodleSessionegela
+            _cookie = respuesta1.headers['Set-Cookie']
+            MoodleSessionegela = _cookie.split("MoodleSessionegela=")[1].split(";")[0]
+            # logintoken campo input del fomulario
+            token = bs4.BeautifulSoup(respuesta1.text, "html.parser")
+            logintoken = token.find("input", {"name": "logintoken"})["value"]
+        else:
+            print("Error al obtener MoodleSessionegela y logintoken.")
+            print(respuesta1.status_code)
+            exit(1)
 
         progress = 25
         progress_var.set(progress)
