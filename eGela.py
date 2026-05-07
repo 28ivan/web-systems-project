@@ -76,7 +76,7 @@ class eGela:
 
         print('------------------------')
         print(f'Solicitud2:\n\t{metodo} {uri}')
-        #print(f'\t{cuerpo}')
+        print(f"\tEnviando credenciales del usuario: {cuerpo['username']}")
         print(f'Respuesta2:\n\t{respuesta2.status_code} {respuesta2.reason}')
         
         
