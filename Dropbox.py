@@ -5,8 +5,8 @@ from socket import AF_INET, socket, SOCK_STREAM
 import json
 import helper
 
-app_key = ''
-app_secret = ''
+app_key = 'bid6rqqjarpai05'
+app_secret = '47cvy5msb4sz06v'
 server_addr = "localhost"
 server_port = 8070
 redirect_uri = "http://" + server_addr + ":" + str(server_port)
@@ -46,7 +46,7 @@ class Dropbox:
                         "<head><title>Proba</title></head>" \
                         "<body>The authentication flow has completed. Close this window.</body>" \
                         "</html>"
-        client_connection.sendall(http_response)
+        client_connection.sendall(http_response.encode('utf-8'))
         client_connection.close()
         server_socket.close()
 
@@ -84,12 +84,28 @@ class Dropbox:
         print("/list_folder")
         uri = 'https://api.dropboxapi.com/2/files/list_folder'
         # https://www.dropbox.com/developers/documentation/http/documentation#files-list_folder
-        #############################################
-        # RELLENAR CON CODIGO DE LA PETICION HTTP
-        # Y PROCESAMIENTO DE LA RESPUESTA HTTP
-        #############################################
+        cabeceras = {
+            'Authorization': f'Bearer {self._access_token}',
+            'Content-Type': 'application/json'
+        }
 
-        self._files = helper.update_listbox2(msg_listbox, self._path, contenido_json)
+        ruta_dropbox = "" if self._path == "/" else self._path
+        
+        cuerpo = {
+            "path": ruta_dropbox,
+            "recursive": False,
+            "include_media_info": False,
+            "include_deleted": False,
+            "include_has_explicit_shared_members": False
+        }
+        respuesta = requests.post(uri, headers=cabeceras, json=cuerpo)
+        print(f"Respuesta list_folder: {respuesta.status_code}")
+        if respuesta.status_code == 200:
+            contenido_json = respuesta.json()
+            self._files = helper.update_listbox2(msg_listbox, self._path, contenido_json)
+        else:
+            print("Error al listar archivos de Dropbox:")
+            print(respuesta.text)
 
     def transfer_file(self, file_path, file_data):
         print("/upload")

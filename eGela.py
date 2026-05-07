@@ -68,17 +68,19 @@ class eGela:
             'Cookie': f'MoodleSessionegela={MoodleSessionegela}'
         }
         cuerpo = {
-            'username': username,
-            'password': password,
+            'username': username.get(),
+            'password': password.get(),
             'logintoken': logintoken
         }
         respuesta2 = requests.request(metodo, uri, headers=cabeceras, data=cuerpo, allow_redirects=False)
 
         print('------------------------')
         print(f'Solicitud2:\n\t{metodo} {uri}')
-        print(f'\t{cuerpo}')
+        #print(f'\t{cuerpo}')
         print(f'Respuesta2:\n\t{respuesta2.status_code} {respuesta2.reason}')
-        print(f'\t{respuesta2.headers["Location"]}\n\t{respuesta2.headers["Set-Cookie"]}')
+        
+        
+        #print(f'\t{respuesta2.headers["Location"]}\n\t{respuesta2.headers["Set-Cookie"]}')
 
         if respuesta2.status_code == 303:
             # Obtenemos la cabecera Location
@@ -86,7 +88,7 @@ class eGela:
             if "Set-Cookie" in respuesta2.headers:
                 MoodleSessionegela = respuesta2.headers['Set-Cookie'].split('MoodleSessionegela=')[1].split(';')[0]
         else:
-            print("Error al autenticarse.")
+            print("Error al autenticarse. Revisa tus credenciales.")
             print(respuesta2.status_code)
             exit(1)
 
@@ -111,7 +113,7 @@ class eGela:
         print('------------------------')
         print(f'Solicitud3:\n\t{metodo} {uri}')
         print(f'Respuesta3:\n\t{respuesta3.status_code} {respuesta3.reason}')
-        print(f'\t{respuesta3.headers["Location"]}')
+        #print(f'\t{respuesta3.headers["Location"]}')
 
         if respuesta3.status_code != 303:
             print("Error al autenticarse.")
