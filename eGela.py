@@ -89,8 +89,9 @@ class eGela:
                 MoodleSessionegela = respuesta2.headers['Set-Cookie'].split('MoodleSessionegela=')[1].split(';')[0]
         else:
             print("Error al autenticarse. Revisa tus credenciales.")
-            print(respuesta2.status_code)
-            exit(1)
+            popup.destroy()
+            messagebox.showinfo("Alert Message", "Login incorrect!")
+            return
 
         progress = 50
         progress_var.set(progress)
@@ -117,9 +118,9 @@ class eGela:
 
         if respuesta3.status_code != 303:
             print("Error al autenticarse.")
-            print(respuesta3.status_code)
-            # print(respuesta3.text)
-            exit(1)
+            popup.destroy() 
+            messagebox.showinfo("Alert Message", "Login incorrect!") 
+            return
         else:
             # Obtenemos la cabecera Location
             location = respuesta3.headers['Location']
@@ -214,50 +215,65 @@ class eGela:
         # PARA BUSCAR PDFs
         #############################################
 
-        soup = bs4.BeautifulSoup(respuesta.text, "html.parser")
+        soup_principal = bs4.BeautifulSoup(respuesta.text, "html.parser")
 
         self._refs = []
 
-        enlaces = soup.find_all("a")
+        urls_secciones = [self._curso]
 
-        for enlace in enlaces:
+        for enlace in soup_principal.find_all("a"):
             href = enlace.get("href")
+            # Identificamos los enlaces que llevan a las otras pestañas
+            if href is not None and "course/view.php?id=" in href and "&section=" in href:
+                if href not in urls_secciones:
+                    urls_secciones.append(href)
 
-            if href is not None and "mod/resource/view.php" in href:
+        # CALCULAR EL AVANCE DE LA BARRA DE PROGRESO
+        if len(urls_secciones) > 0:
+            progress_step = float(100.0 / len(urls_secciones))
+        else:
+            progress_step = 100.0
 
-                respuesta_pdf = requests.request(
-                    "GET",
-                    href,
-                    headers=cabeceras,
-                    allow_redirects=False
-                )
+        recursos_procesados = []
 
-                if respuesta_pdf.status_code == 303:
-                    pdf_link = respuesta_pdf.headers["Location"]
+        # BUCLE PRINCIPAL: ENTRAR EN CADA PESTAÑA
+        for url_seccion in urls_secciones:
+            
+            # Descargamos el HTML de esta pestaña en concreto
+            resp_sec = requests.request("GET", url_seccion, headers=cabeceras, allow_redirects=False)
+            soup_sec = bs4.BeautifulSoup(resp_sec.text, "html.parser")
 
-                    pdf_name = pdf_link.split("/")[-1]
-                    pdf_name = unquote(pdf_name)
+            # Buscamos los PDFs dentro de esta pestaña
+            for enlace in soup_sec.find_all("a"):
+                href = enlace.get("href")
 
-                    if pdf_name.lower().endswith(".pdf"):
-                        self._refs.append({
-                            "pdf_name": pdf_name,
-                            "pdf_link": pdf_link
-                        })
+                if href is not None and "mod/resource/view.php" in href:
+                    
+                    # Evitamos descargar el mismo PDF dos veces si eGela lo repite
+                    if href not in recursos_procesados:
+                        recursos_procesados.append(href)
 
-        # INICIALIZA Y ACTUALIZAR BARRA DE PROGRESO
-        # POR CADA PDF ANIADIDO EN self._refs
+                        respuesta_pdf = requests.request(
+                            "GET",
+                            href,
+                            headers=cabeceras,
+                            allow_redirects=False
+                        )
 
-        if len(self._refs) > 0:
-            progress_step = float(100.0 / len(self._refs))
+                        if respuesta_pdf.status_code == 303:
+                            pdf_link = respuesta_pdf.headers["Location"]
+                            pdf_name = pdf_link.split("/")[-1]
+                            pdf_name = unquote(pdf_name)
 
-            progress = 0
-            for pdf in self._refs:
-                print(pdf["pdf_name"], "->", pdf["pdf_link"])
-
-                progress += progress_step
-                progress_var.set(progress)
-                progress_bar.update()
-                time.sleep(0.1)
+                            if pdf_name.lower().endswith(".pdf"):
+                                self._refs.append({
+                                    "pdf_name": pdf_name,
+                                    "pdf_link": pdf_link
+                                })
+                                print(f"{pdf_name} -> {pdf_link}")
+            progress += progress_step
+            progress_var.set(progress)
+            progress_bar.update()
 
         popup.destroy()
         return self._refs
@@ -273,10 +289,9 @@ class eGela:
             'Cookie': f'MoodleSessionegela={self._cookie}'
         }
         pdf_object = self._refs[selection]
-        pdf_name = pdf_object['pdf_name'] + ".pdf"
+        pdf_name = pdf_object['pdf_name']
         pdf_link = pdf_object['pdf_link']
-        pdf_response = requests.request('GET', pdf, headers=cabeceras, allow_redirects=False)
-        pdf_link = requests.request('GET', pdf_response.headers['Location'], headers=cabeceras, allow_redirects=False)
-        pdf_content = pdf_link.content
+        pdf_response = requests.request('GET', pdf_link, headers=cabeceras)
+        pdf_content = pdf_response.content
 
         return pdf_name, pdf_content

@@ -5,8 +5,8 @@ from socket import AF_INET, socket, SOCK_STREAM
 import json
 import helper
 
-app_key = 'bid6rqqjarpai05'
-app_secret = '47cvy5msb4sz06v'
+app_key = ''
+app_secret = ''
 server_addr = "localhost"
 server_port = 8070
 redirect_uri = "http://" + server_addr + ":" + str(server_port)
@@ -84,6 +84,12 @@ class Dropbox:
         print("/list_folder")
         uri = 'https://api.dropboxapi.com/2/files/list_folder'
         # https://www.dropbox.com/developers/documentation/http/documentation#files-list_folder
+        
+        # LIMPIEZA DE LA RUTA 
+        self._path = self._path.replace("\\", "/").replace("//", "/").strip()
+        if self._path.endswith("/") and len(self._path) > 1:
+            self._path = self._path.rstrip("/")
+        #
         cabeceras = {
             'Authorization': f'Bearer {self._access_token}',
             'Content-Type': 'application/json'
@@ -115,6 +121,27 @@ class Dropbox:
         # RELLENAR CON CODIGO DE LA PETICION HTTP
         # Y PROCESAMIENTO DE LA RESPUESTA HTTP
         #############################################
+        # Configuramos las cabeceras. La subida de archivos en Dropbox es especial:
+        # Pide que los datos de la ruta vayan en una cabecera llamada 'Dropbox-API-Arg'
+        # y que el tipo de contenido sea 'application/octet-stream' (datos binarios)
+        cabeceras = {
+            'Authorization': f'Bearer {self._access_token}',
+            'Content-Type': 'application/octet-stream',
+            'Dropbox-API-Arg': json.dumps({
+                "path": file_path,
+                "mode": "add",
+                "autorename": True,
+                "mute": False
+            })
+        }
+
+        # POST con data=file_data porque se manda un PDF no un JSON
+        respuesta = requests.post(uri, headers=cabeceras, data=file_data)
+
+        print(f"Respuesta transfer_file: {respuesta.status_code}")
+        if respuesta.status_code != 200:
+            print("Error al subir el archivo:")
+            print(respuesta.text)
 
     def delete_file(self, file_path):
         print("/delete_file")
@@ -125,10 +152,51 @@ class Dropbox:
         # Y PROCESAMIENTO DE LA RESPUESTA HTTP
         #############################################
 
+        cabeceras = {
+            'Authorization': f'Bearer {self._access_token}',
+            'Content-Type': 'application/json'
+        }
+
+        cuerpo = {
+            "path": file_path
+        }
+
+        respuesta = requests.post(uri, headers=cabeceras, json=cuerpo)
+        
+        print(f"Respuesta delete_file: {respuesta.status_code}")
+        
+        if respuesta.status_code != 200:
+            print("Error al borrar el archivo en Dropbox:")
+            print(respuesta.text)
+
     def create_folder(self, path):
         print("/create_folder")
+        uri = 'https://api.dropboxapi.com/2/files/create_folder_v2'
        # https://www.dropbox.com/developers/documentation/http/documentation#files-create_folder
         #############################################
         # RELLENAR CON CODIGO DE LA PETICION HTTP
         # Y PROCESAMIENTO DE LA RESPUESTA HTTP
         #############################################
+        # Limpiar el path, se quitan dobles barras, barras invertidas y espacios al principio/final
+        path = path.replace("\\", "/").replace("//", "/").strip()
+        if path.endswith("/") and len(path) > 1:
+            path = path.rstrip("/")
+        self._path = path
+        
+        cabeceras = {
+            'Authorization': f'Bearer {self._access_token}',
+            'Content-Type': 'application/json'
+        }
+
+        cuerpo = {
+            "path": path,
+            "autorename": False
+        }
+
+        respuesta = requests.post(uri, headers=cabeceras, json=cuerpo)
+
+        print(f"Respuesta create_folder: {respuesta.status_code}")
+        
+        if respuesta.status_code != 200:
+            print("Error al crear la carpeta en Dropbox:")
+            print(respuesta.text)
