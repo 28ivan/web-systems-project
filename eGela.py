@@ -155,11 +155,10 @@ class eGela:
             COMPROBACION_DE_LOG_IN = True
             soup = bs4.BeautifulSoup(respuesta4.text, 'html.parser')
             enlaces = soup.find_all('a')
+            i=0
             for enlace in enlaces:
-                if "Sistemas Web" in enlace.text:
+                if enlace.text.strip() == "Sistemas Web":
                     uri_curso = enlace.get('href')
-
-
 
         progress = 100
         progress_var.set(progress)
