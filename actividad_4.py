@@ -6,6 +6,8 @@ import Dropbox
 import helper
 import time
 from urllib.parse import unquote
+from tkinter import messagebox
+
 
 ##########################################################################################################
 
@@ -27,6 +29,8 @@ def make_listbox(messages_frame):
     return msg_listbox
 
 def transfer_files():
+    if not selected_items1:
+        return
     popup, progress_var, progress_bar = helper.progress("transfer_file", "Transfering files...")
     progress = 0
     progress_var.set(progress)
@@ -60,6 +64,8 @@ def transfer_files():
     msg_listbox2.yview(tk.END)
 
 def delete_files():
+    if not selected_items2:
+        return
     popup, progress_var, progress_bar = helper.progress("delete_file", "Deleting files...")
     progress = 0
     progress_var.set(progress)
@@ -82,6 +88,10 @@ def delete_files():
     dropbox.list_folder(msg_listbox2)
 
 def name_folder(folder_name):
+    if not folder_name or "." in folder_name:
+        messagebox.showwarning("Aviso", "El nombre de la carpeta no puede estar vacío ni contener puntos.")
+        return
+    
     if dropbox._path == "/":
         dropbox._path = dropbox._path + str(folder_name)
     else:
@@ -109,6 +119,47 @@ def create_folder():
     send_button = tk.Button(login_frame, text="Send", command=lambda: name_folder(entry_field.get()))
     send_button.pack(side=tk.TOP)
     dropbox._root = popup
+
+
+def download_files():
+    if not selected_items2:
+        return
+
+    popup, progress_var, progress_bar = helper.progress("download_file", "Downloading to PC...")
+    progress = 0
+    progress_var.set(progress)
+    progress_bar.update()
+    progress_step = float(100.0 / len(selected_items2))
+
+    if not os.path.exists("descargas_dropbox"):
+        os.makedirs("descargas_dropbox")
+
+    for each in selected_items2:
+        file_info = dropbox._files[each]
+        
+        # Solo descargamos si es un archivo (no carpetas)
+        if file_info['.tag'] == 'file':
+            file_name = file_info['name']
+            
+            if dropbox._path == "/":
+                file_path = "/" + file_name
+            else:
+                file_path = dropbox._path + "/" + file_name
+            
+            datos_archivo = dropbox.download_file(file_path)
+            
+            if datos_archivo:
+                # Guardamos el archivo físicamente en el PC
+                ruta_local = os.path.join("descargas_dropbox", file_name)
+                with open(ruta_local, "wb") as f:
+                    f.write(datos_archivo)
+        
+        progress += progress_step
+        progress_var.set(progress)
+        progress_bar.update()
+
+    popup.destroy()
+    messagebox.showinfo("Download", f"Archivos guardados en la carpeta:\n{os.path.abspath('descargas_dropbox')}")
 
 
 ##########################################################################################################
@@ -248,10 +299,19 @@ messages_frame2.grid(row=1, column=2, ipadx=10, ipady=10, padx=2, pady=2)
 # Frame con botones Create y Delete (1,3)
 
 frame2 = tk.Frame(newroot)
-button2 = tk.Button(frame2, borderwidth=4,  background="#C6185C",fg="white", text="Delete", width=10, pady=8, command=delete_files)
+button2 = tk.Button(frame2, borderwidth=4,  background="#C6185C",fg="white", text="Delete", width=14, pady=8, command=delete_files)
 button2.pack(padx=2, pady=2)
-button3 = tk.Button(frame2, borderwidth=4, background="#7C86FF",fg="white", text="Create folder", width=10, pady=8, command=create_folder)
+button3 = tk.Button(frame2, borderwidth=4, background="#7C86FF",fg="white", text="Create folder", width=14, pady=8, command=create_folder)
 button3.pack(padx=2, pady=2)
+
+#Botón funcionalidad adicional
+button4 = tk.Button(frame2, borderwidth=4, background="#005CE5", fg="white", text="Account Info", width=14, pady=8, command=dropbox.get_account_info)
+button4.pack(padx=2, pady=5)
+
+# Botón para descargar (en frame2)
+button5 = tk.Button(frame2, borderwidth=4, background="#00AD7C", fg="white", text="Download to PC", width=14, pady=8, command=download_files)
+button5.pack(padx=2, pady=5)
+
 frame2.grid(row=1, column=3,  ipadx=10, ipady=10)
 
 for each in pdfs:

@@ -4,6 +4,7 @@ import webbrowser
 from socket import AF_INET, socket, SOCK_STREAM
 import json
 import helper
+from tkinter import messagebox
 
 app_key = ''
 app_secret = ''
@@ -200,3 +201,66 @@ class Dropbox:
         if respuesta.status_code != 200:
             print("Error al crear la carpeta en Dropbox:")
             print(respuesta.text)
+
+    def get_account_info(self):
+        print("/get_account_info")
+        #Petición para obtener datos del usuario (Nombre e Email)
+        uri_user = 'https://api.dropboxapi.com/2/users/get_current_account'
+        cabeceras = {'Authorization': f'Bearer {self._access_token}'}
+        
+        #Petición para obtener el uso del espacio
+        uri_space = 'https://api.dropboxapi.com/2/users/get_space_usage'
+        
+        res_user = requests.post(uri_user, headers=cabeceras)
+        res_space = requests.post(uri_space, headers=cabeceras)
+        
+        if res_user.status_code == 200 and res_space.status_code == 200:
+            u = res_user.json()
+            s = res_space.json()
+            
+            nombre = u['name']['display_name']
+            email = u['email']
+            tipo_cuenta = u['account_type']['.tag']
+            
+            #Pasar de bytes, los pasamos a Gigabytes (GB)
+            # 1 GB = 1024 * 1024 * 1024 bytes
+            usado_gb = s['used'] / (1024**3)
+            
+            # El total depende de si es cuenta individual o de equipo
+            if 'allocated' in s['allocation']:
+                total_gb = s['allocation']['allocated'] / (1024**3)
+            else:
+                total_gb = s['allocation']['individual']['allocated'] / (1024**3)
+            
+            porcentaje = (usado_gb / total_gb) * 100
+            
+            # Construimos el mensaje "vistoso"
+            mensaje = f" Usuario: {nombre}\n"
+            mensaje += f" Email: {email}\n"
+            mensaje += f" Tipo: {tipo_cuenta.capitalize()}\n"
+            mensaje += "-"*30 + "\n"
+            mensaje += f" Almacenamiento: {porcentaje:.2f}%\n"
+            mensaje += f"   [{usado_gb:.2f} GB de {total_gb:.2f} GB usados]"
+            
+            messagebox.showinfo("Dropbox Account Info", mensaje)
+        else:
+            messagebox.showerror("Error", "No se pudo obtener la información de la cuenta.")
+
+
+    def download_file(self, file_path):
+        print("/download")
+        uri = 'https://content.dropboxapi.com/2/files/download'
+        
+        cabeceras = {
+            'Authorization': f'Bearer {self._access_token}',
+            'Dropbox-API-Arg': json.dumps({"path": file_path})
+        }
+        
+        respuesta = requests.post(uri, headers=cabeceras)
+        
+        if respuesta.status_code == 200:
+            return respuesta.content
+        else:
+            print("Error al descargar el archivo de Dropbox:")
+            print(respuesta.text)
+            return None
